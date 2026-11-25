@@ -668,7 +668,7 @@ def test_the_workflow_defines_the_four_expected_stages():
         story_coordinator.CREATE_RESTRICTION, story_coordinator.CONFINEMENT}
     assert rules()["blocked_paths"] == [
         ".git/", ".harness/runs/", ".harness/history/", ".harness/stories/",
-        "rules/"]
+        ".harness/windows-known-failures.txt", "rules/"]
 
     deployed = conftest.shipped_workflow(REPO_ROOT, "story-workflow")
     assert [stage["name"] for stage in deployed["stages"]] == [

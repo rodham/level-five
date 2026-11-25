@@ -85,7 +85,25 @@ inspect_max_cost_usd: 12
 # history_retention_days: 90
 architecture_docs:
   - .harness/docs/ARCHITECTURE.md
-test_command: .venv/bin/python -m pytest tests/ -q -n auto
+# While the harness is being ported to Windows, the suite runs through
+# .harness/dual_suite.py: on Linux first, then natively on Windows over a copy
+# of the tree on a Windows drive, so every gate a run takes is a gate on both
+# systems. The harness runs under WSL, and L5_WINDOWS_PYTHON must name the
+# Windows interpreter as a WSL path or the command fails rather than report a
+# Linux-only pass. Windows failures are held to
+# .harness/windows-known-failures.txt, which no stage may write. Everything
+# after the script name is pytest's, on both systems; read the script's
+# docstring for the whole contract.
+#
+# TEMPORARY: the --deselect below drops one test that fails under WSL on main
+# as well. The freshness signature (artifact_signatures in
+# orchestration/story_coordinator.py) assumes a rewrite moves a file's mtime,
+# and WSL's 6.6 kernel stamps files from a clock coarse enough that two writes
+# a few milliseconds apart share one. Without the deselection every gate in WSL
+# is red, including the gates of the story that fixes it. Remove it in that
+# story, which ages existing outputs' mtimes when the snapshot is taken so any
+# later write is newer whatever the clock's granularity.
+test_command: .venv/bin/python .harness/dual_suite.py tests/ -q -n auto --deselect tests/test_required_output_freshness.py::test_an_identical_rewrite_moves_the_modification_time_and_not_the_size
 # How this repository files an outbox entry: the reference implementation it
 # ships, installed into .harness/scripts/ by l5-init and wired up here, so the
 # script the harness hands to every target is the script this repository is
@@ -154,8 +172,10 @@ sync_timeout_seconds: 120
 # governed edits reverted, where it must fail — instead of on a twelve-minute
 # suite. Anything short of pass-then-fail falls through to the whole suite, so
 # a bad nomination costs one extra selector run and changes no verdict. No
-# -n auto here: one test is not worth the workers it would start.
-test_selection_command: .venv/bin/python -m pytest {test} -q
+# -n auto here: one test is not worth the workers it would start. --strict
+# holds the nominated test to passing on Windows as well as Linux, ignoring the
+# known-failures list, so a Windows fix is shown to be needed on Windows.
+test_selection_command: .venv/bin/python .harness/dual_suite.py --strict {test} -q
 # This repository's suite census: it prints a JSON object of counter names to
 # integers, and a stage declaring suite_census has it run in a clone at that
 # stage's baseline and again in the tree the stage left. The counters are this

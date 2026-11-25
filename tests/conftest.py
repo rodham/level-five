@@ -4,7 +4,6 @@ import importlib.machinery
 import importlib.util
 import json
 import os
-import pty
 import shutil
 import subprocess
 import sys
@@ -13,6 +12,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+
+# `pty` exists only on POSIX. It is imported optionally so the suite still
+# loads on Windows, where `a_terminal_for_stdin` below is the one thing that
+# cannot work; the tests that need it fail there as themselves rather than
+# taking the whole suite down at import.
+try:
+    import pty
+except ImportError:
+    pty = None
 
 HARNESS_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HARNESS_ROOT / "orchestration"))
@@ -696,6 +704,9 @@ def a_terminal_for_stdin(reply: str = APPROVES + DECLINES):
     invocation changes: stdout and stderr stay the caller's, so a module that
     captures them still captures them.
     """
+    if pty is None:
+        raise OSError("this platform has no pty, so no terminal can be "
+                      "handed to the child as stdin")
     master, slave = pty.openpty()
     try:
         os.write(master, reply.encode())

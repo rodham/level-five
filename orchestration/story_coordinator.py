@@ -40,7 +40,6 @@ still permitted and left standing exactly as before.
 from __future__ import annotations
 
 import contextlib
-import fcntl
 import functools
 import hashlib
 import json
@@ -55,6 +54,15 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
+
+# `fcntl` exists only on POSIX. Imported optionally so the coordinator loads on
+# Windows; there `_try_suite_lock` raises OSError, which `suite_turn` already
+# treats as a lock file it cannot use: the suite runs without the turn and a
+# note says why. A Windows suite lock is its own piece of work.
+try:
+    import fcntl
+except ImportError:
+    fcntl = None
 
 import agent_runner
 import brief_key
@@ -4518,6 +4526,9 @@ def _try_suite_lock(handle) -> bool:
     Any failure other than the lock being held propagates, so the caller can
     tell a lock file it cannot use from a turn it has to wait for.
     """
+    if fcntl is None:
+        raise OSError("this platform has no flock, so the suite turn cannot "
+                      "be taken")
     try:
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except BlockingIOError:
