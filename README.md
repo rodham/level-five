@@ -68,7 +68,7 @@ Run directories are execution state rather than source, so `.harness/runs/` is g
 
 ## Prerequisites
 
-**The harness runs on macOS and Linux only.** It does not run on Windows: the coordinator takes its suite lock with `fcntl`, bounds every configured command with a POSIX process group, and links build state into worktrees with symlinks, and the reference tracker script is bash with `jq`. WSL is untested.
+**The harness runs on macOS and Linux, and under WSL.** It does not yet run natively on Windows: the coordinator takes its suite lock with `fcntl`, bounds every configured command with a POSIX process group, and links build state into worktrees with symlinks, and the reference tracker script is bash with `jq`. A port is under way, run by the harness itself from WSL with every gate testing both systems; see "Porting the harness to Windows" in [`.harness/docs/ARCHITECTURE.md`](.harness/docs/ARCHITECTURE.md) for the plan and how the gate works.
 
 - Claude Code CLI (`claude`) with an active subscription
 - Python 3 (3.10+)
@@ -138,9 +138,9 @@ Every one of these steps has a reason, a boundary and a set of things it deliber
 
 The Story Coordinator is deterministic and fully unit-tested without any model calls (a fake runner plays back scripted stage artifacts). Run the suite with:
 
-    .venv/bin/python -m pytest tests/ -q -n auto
+    .venv/bin/python .harness/dual_suite.py tests/ -q -n auto
 
-That is `test_command` in `.harness/config.yaml` verbatim, and running it verbatim is the point: the harness's own gates — the revert check, the coordinator's suite run in the tree, and the clean-clone check — execute the configured command, so what a developer runs and what the gates run cannot drift apart. `-n auto` reads the core count of whatever machine it lands on, so no core count is written down anywhere.
+That is `test_command` in `.harness/config.yaml` verbatim, apart from a temporary `--deselect` the config explains, and running it verbatim is the point. While the harness is ported to Windows it runs the suite on Linux and then natively on Windows, so it needs WSL and `L5_WINDOWS_PYTHON` set to a Windows interpreter; `.venv/bin/python -m pytest tests/ -q -n auto` still runs the Linux half alone. Running the configured command verbatim is the point: the harness's own gates — the revert check, the coordinator's suite run in the tree, and the clean-clone check — execute the configured command, so what a developer runs and what the gates run cannot drift apart. `-n auto` reads the core count of whatever machine it lands on, so no core count is written down anywhere.
 
 The dependencies that command needs are declared in `requirements-dev.txt`, and it has to be installed into **both** interpreters this repository configures — the one you run the suite in and the one `verification_runner` names:
 
